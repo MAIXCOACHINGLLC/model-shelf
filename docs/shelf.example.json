@@ -1,0 +1,39 @@
+{
+  "hfStores": ["~/.cache/huggingface/hub"],
+  "fileStores": ["~/ComfyUI/models"],
+  "ollama": "http://127.0.0.1:11434",
+  "skills": ["~/.claude/skills"],
+  "agents": {
+    "~/agents/video-maker": "Video maker"
+  },
+  "skipAgents": [],
+  "models": [
+    {
+      "id": "whisper",
+      "name": "Whisper large-v3-turbo",
+      "kind": "Hearing",
+      "icon": "ear",
+      "color": "orange",
+      "match": [".cache/huggingface/hub/models--mlx-community--whisper-large-v3-turbo"],
+      "what": "OpenAI's speech-to-text model, the fast large version. It listens to audio and writes down each word with its timing."
+    },
+    {
+      "id": "qwen-image",
+      "name": "Qwen-Image",
+      "kind": "Pictures",
+      "icon": "photo",
+      "color": "blue",
+      "match": ["ComfyUI/models/diffusion_models/qwen-image*", "ComfyUI/models/vae/qwen_image_vae*"],
+      "what": "Makes a still picture from a written description."
+    },
+    {
+      "id": "old-talker",
+      "name": "Old talking-head model",
+      "kind": "Talking video",
+      "match": ["ComfyUI/models/diffusion_models/old-talker*"],
+      "what": "A talking-face model kept for reference.",
+      "status": "unused",
+      "note": "The code names it, but nothing calls it."
+    }
+  ]
+}

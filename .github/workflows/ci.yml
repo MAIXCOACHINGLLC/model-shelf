@@ -1,0 +1,15 @@
+name: Build and test
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    # Runs only once the repository is public (macOS minutes on a private repository are billed).
+    if: ${{ !github.event.repository.private }}
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift build
+      - run: swift test
+      - run: ./scripts/build-app.sh

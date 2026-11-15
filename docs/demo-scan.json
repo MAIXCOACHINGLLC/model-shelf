@@ -1,0 +1,190 @@
+{
+ "entries": [
+  {
+   "id": "ltx",
+   "name": "LTX-2.3",
+   "kind": "Video clips",
+   "icon": "film",
+   "color": "purple",
+   "gb": 29.8,
+   "section": "used",
+   "users": [
+    {
+     "agent": "video-maker",
+     "how": "names it in app/config.py",
+     "tag": "job"
+    }
+   ],
+   "what": "Turns a still picture into a short moving clip.",
+   "store": "~/.cache/huggingface/hub",
+   "loaded": false,
+   "isNew": false,
+   "note": null,
+   "files": [
+    "ltx"
+   ]
+  },
+  {
+   "id": "qwen-image",
+   "name": "Qwen-Image",
+   "kind": "Pictures",
+   "icon": "photo",
+   "color": "blue",
+   "gb": 20.4,
+   "section": "used",
+   "users": [
+    {
+     "agent": "video-maker",
+     "how": "names it in app/graphs.py",
+     "tag": "job"
+    }
+   ],
+   "what": "Makes a still picture from a written description.",
+   "store": "~/ComfyUI/models/diffusion_models",
+   "loaded": false,
+   "isNew": false,
+   "note": null,
+   "files": [
+    "qwen-image"
+   ]
+  },
+  {
+   "id": "whisper",
+   "name": "Whisper large-v3-turbo",
+   "kind": "Hearing",
+   "icon": "ear",
+   "color": "orange",
+   "gb": 1.6,
+   "section": "used",
+   "users": [
+    {
+     "agent": "transcriber",
+     "how": "names it in transcribe.py",
+     "tag": "job"
+    },
+    {
+     "agent": "captions skill",
+     "how": "skill script scripts/align.py",
+     "tag": "skill"
+    },
+    {
+     "agent": "podcast-clips",
+     "how": "runs the captions skill",
+     "tag": "job"
+    }
+   ],
+   "what": "OpenAI's speech-to-text model, the fast large version. It listens to audio and writes down each word with its timing.",
+   "store": "~/.cache/huggingface/hub",
+   "loaded": false,
+   "isNew": false,
+   "note": null,
+   "files": [
+    "whisper"
+   ]
+  },
+  {
+   "id": "kokoro",
+   "name": "Kokoro 82M",
+   "kind": "Voice",
+   "icon": "waveform",
+   "color": "pink",
+   "gb": 0.3,
+   "section": "used",
+   "users": [
+    {
+     "agent": "podcast-clips",
+     "how": "names it in voice.py",
+     "tag": "job"
+    }
+   ],
+   "what": "A small text-to-speech model that reads a script aloud.",
+   "store": "~/.cache/huggingface/hub",
+   "loaded": false,
+   "isNew": false,
+   "note": null,
+   "files": [
+    "kokoro"
+   ]
+  },
+  {
+   "id": "llama",
+   "name": "llama3.1:8b",
+   "kind": "Writing",
+   "icon": "text.bubble",
+   "color": "gray",
+   "gb": 4.9,
+   "section": "idle",
+   "users": [],
+   "what": "A general text model, run by Ollama on this Mac.",
+   "store": "Ollama",
+   "loaded": true,
+   "isNew": false,
+   "note": "In memory now. A chat ran it by hand; no scheduled job names it.",
+   "files": [
+    "llama"
+   ]
+  },
+  {
+   "id": "wan",
+   "name": "Wan 2.2 clips",
+   "kind": "Video clips",
+   "icon": "film",
+   "color": "purple",
+   "gb": 23.1,
+   "section": "idle",
+   "users": [
+    {
+     "agent": "video-maker",
+     "how": "names it in app/graphs.py",
+     "tag": "job"
+    }
+   ],
+   "what": "An older picture-to-clip model the video maker can still pick.",
+   "store": "~/ComfyUI/models/diffusion_models",
+   "loaded": false,
+   "isNew": false,
+   "note": "Not used since a newer model became the default.",
+   "files": [
+    "wan"
+   ]
+  },
+  {
+   "id": "sdxl",
+   "name": "sd_xl_base_1.0",
+   "kind": "Picture or video model",
+   "icon": "photo.on.rectangle",
+   "color": "gray",
+   "gb": 6.9,
+   "section": "unused",
+   "users": [],
+   "what": "Found on disk. No description yet.",
+   "store": "~/ComfyUI/models/checkpoints",
+   "loaded": false,
+   "isNew": true,
+   "note": null,
+   "files": [
+    "sdxl"
+   ]
+  },
+  {
+   "id": "faster-whisper",
+   "name": "Systran/faster-whisper-small.en",
+   "kind": "Model",
+   "icon": "shippingbox",
+   "color": "gray",
+   "gb": 0.5,
+   "section": "unused",
+   "users": [],
+   "what": "Found on disk. No description yet.",
+   "store": "~/.cache/huggingface/hub",
+   "loaded": false,
+   "isNew": true,
+   "note": null,
+   "files": [
+    "faster-whisper"
+   ]
+  }
+ ],
+ "at": "2026-11-15T09:30:00Z",
+ "warnings": []
+}
