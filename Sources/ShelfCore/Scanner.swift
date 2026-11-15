@@ -115,8 +115,21 @@ private func getJSON(_ url: String) -> [String: Any]? {
     return result
 }
 
+// A regular file's size; 0 for a folder, a link or anything else.
 private func size(_ path: String) -> Int64 {
-    (try? fm.attributesOfItem(atPath: path)[.size] as? NSNumber)?.int64Value ?? 0
+    guard let a = try? fm.attributesOfItem(atPath: path), a[.type] as? FileAttributeType == .typeRegular else { return 0 }
+    return (a[.size] as? NSNumber)?.int64Value ?? 0
+}
+
+// Every regular file under dir, as a path from dir with its size. Skips hidden names and links; goes into a folder
+// only if `enter` says so. Written out instead of FileManager's enumerator, whose skipping differs on Windows.
+private func walk(_ dir: String, _ rel: String = "", enter: (String) -> Bool, into out: inout [(rel: String, size: Int64)]) {
+    for name in ((try? fm.contentsOfDirectory(atPath: dir)) ?? []).sorted() where !name.hasPrefix(".") {
+        let path = dir + "/" + name, r = rel.isEmpty ? name : rel + "/" + name
+        guard let a = try? fm.attributesOfItem(atPath: path), let type = a[.type] as? FileAttributeType else { continue }
+        if type == .typeDirectory, enter(path) { walk(path, r, enter: enter, into: &out) }
+        if type == .typeRegular { out.append((r, (a[.size] as? NSNumber)?.int64Value ?? 0)) }
+    }
 }
 
 private struct Scanner {
@@ -167,22 +180,15 @@ private struct Scanner {
 
     func fileItems(_ store: String) -> [Item] {
         let root = expand(store)
-        let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey]
-        guard fm.fileExists(atPath: root), let e = fm.enumerator(at: URL(fileURLWithPath: root), includingPropertiesForKeys: keys) else { return [] }
-        var items: [Item] = []
-        for case let url as URL in e {
-            let v = try? url.resourceValues(forKeys: Set(keys))
-            let path = pathOf(url), name = lastPart(path)
-            if v?.isSymbolicLink == true { e.skipDescendants(); continue }      // links point into a store listed on its own
-            if name.hasPrefix(".") { e.skipDescendants(); continue }
-            // A Hugging Face cache inside a model folder (it carries CACHEDIR.TAG) belongs in hfStores, not here.
-            if v?.isDirectory == true, fm.fileExists(atPath: path + "/CACHEDIR.TAG") { e.skipDescendants(); continue }
-            guard v?.isRegularFile == true, let s = v?.fileSize, s >= 5_000_000 else { continue }
-            let folder = parent(path)
-            items.append(Item(key: key(path), store: tilde(folder), ids: [name], gb: Double(s) / 1e9,
-                              defaultKind: folderKinds[lastPart(folder)] ?? "Model"))
+        // Links point into a store listed on its own. A Hugging Face cache inside a model folder (it carries
+        // CACHEDIR.TAG) belongs in hfStores, not here.
+        var found: [(rel: String, size: Int64)] = []
+        walk(root, enter: { !fm.fileExists(atPath: $0 + "/CACHEDIR.TAG") }, into: &found)
+        return found.filter { $0.size >= 5_000_000 }.map { f in
+            let path = root + "/" + f.rel, folder = parent(path)
+            return Item(key: key(path), store: tilde(folder), ids: [lastPart(path)], gb: Double(f.size) / 1e9,
+                        defaultKind: folderKinds[lastPart(folder)] ?? "Model")
         }
-        return items
     }
 
     func ollamaItems() -> (items: [Item], loaded: Set<String>, up: Bool) {
@@ -264,11 +270,10 @@ private struct Scanner {
             rels = run(gitPath, ["-C", git, "ls-files", "-z", "--", prefix.isEmpty ? "." : prefix]).split(separator: "\0")
                 .map { String($0.dropFirst(prefix.count)) }
                 .filter { r in !r.split(separator: "/").dropLast().contains { skipDirs.contains(String($0)) } }
-        } else if let e = fm.enumerator(atPath: root) {
-            while let r = e.nextObject() as? String {
-                if skipDirs.contains(lastPart(norm(r))) { e.skipDescendants(); continue }
-                rels.append(norm(r))
-            }
+        } else {
+            var found: [(rel: String, size: Int64)] = []
+            walk(root, enter: { !skipDirs.contains(lastPart($0)) }, into: &found)
+            rels = found.map(\.rel)
         }
         var out: [SourceFile] = []
         for rel in rels where !cfg.ignoreFiles.contains(where: { glob($0, rel) }) {
