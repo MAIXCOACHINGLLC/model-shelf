@@ -1,16 +1,24 @@
-import AppKit
+import Foundation
 import ShelfCore
+#if os(macOS)
+import AppKit
 import SwiftUI
+#endif
 
-// Model Shelf: a menu bar panel listing every local AI model on this Mac, what it does, and which jobs and skills use it.
-//   ModelShelf                                              the menu bar app
+// Model Shelf: every local AI model on this computer, what it does, and which jobs and skills use it.
+//   ModelShelf                                              Mac: the menu bar app. Linux and Windows: the list below
+//   ModelShelf --list                                       print the list as text and quit
 //   ModelShelf --scan                                       print one scan as JSON and quit
-//   ModelShelf --snapshot out.png [model-id] [scan.json]    draw the panel to a picture
+//   ModelShelf --snapshot out.png [model-id] [scan.json]    Mac: draw the panel to a picture
 
 @main
 enum Main {
     static func main() {
         let args = CommandLine.arguments
+        if args.contains("--help") || args.contains("-h") {
+            print("Usage: ModelShelf [--list | --scan]\nSettings: \(settingsPath())")
+            exit(0)
+        }
         if args.contains("--scan") {
             let enc = JSONEncoder()
             enc.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -18,44 +26,52 @@ enum Main {
             FileHandle.standardOutput.write(try! enc.encode(runScan(config: loadConfig())))
             exit(0)
         }
-        if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
-            let open = i + 2 < args.count ? args[i + 2] : nil
-            var scan = Scan(entries: [], at: Date(), warnings: [])
-            if i + 3 < args.count {
-                let dec = JSONDecoder()
-                dec.dateDecodingStrategy = .iso8601
-                guard let data = FileManager.default.contents(atPath: args[i + 3]), let s = try? dec.decode(Scan.self, from: data) else {
-                    FileHandle.standardError.write(Data("cannot read \(args[i + 3])\n".utf8))
-                    exit(1)
+        #if os(macOS)
+        if !args.contains("--list") {
+            if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
+                let open = i + 2 < args.count ? args[i + 2] : nil
+                var scan = Scan(entries: [], at: Date(), warnings: [])
+                if i + 3 < args.count {
+                    let dec = JSONDecoder()
+                    dec.dateDecodingStrategy = .iso8601
+                    guard let data = FileManager.default.contents(atPath: args[i + 3]), let s = try? dec.decode(Scan.self, from: data) else {
+                        FileHandle.standardError.write(Data("cannot read \(args[i + 3])\n".utf8))
+                        exit(1)
+                    }
+                    scan = s
+                } else {
+                    scan = runScan(config: loadConfig())
                 }
-                scan = s
-            } else {
-                scan = runScan(config: loadConfig())
+                MainActor.assumeIsolated { snapshot(scan, open: open, to: args[i + 1]) }
+                exit(0)
             }
-            MainActor.assumeIsolated { snapshot(scan, open: open, to: args[i + 1]) }
-            exit(0)
+            MainActor.assumeIsolated {
+                let app = NSApplication.shared
+                let delegate = MenuBar()
+                app.delegate = delegate
+                app.setActivationPolicy(.accessory)  // menu bar only, no Dock icon
+                app.run()
+            }
+            return
         }
-        MainActor.assumeIsolated {
-            let app = NSApplication.shared
-            let delegate = MenuBar()
-            app.delegate = delegate
-            app.setActivationPolicy(.accessory)  // menu bar only, no Dock icon
-            app.run()
-        }
+        #endif
+        print(listText(runScan(config: loadConfig())))
     }
 }
 
-/// Settings: ~/Library/Application Support/Model Shelf/shelf.json if present and valid, else built-in defaults.
+/// The settings file (see `settingsPath`) if present and valid, else built-in defaults.
 func loadConfig() -> ShelfConfig {
-    let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Model Shelf/shelf.json")
-    guard let data = try? Data(contentsOf: url) else { return ShelfConfig() }
+    let path = settingsPath()
+    guard let data = FileManager.default.contents(atPath: path) else { return ShelfConfig() }
     do {
         return try JSONDecoder().decode(ShelfConfig.self, from: data)
     } catch {
-        FileHandle.standardError.write(Data("Model Shelf: \(url.path) is not valid (\(error)); using defaults\n".utf8))
+        FileHandle.standardError.write(Data("Model Shelf: \(path) is not valid (\(error)); using defaults\n".utf8))
         return ShelfConfig()
     }
 }
+
+#if os(macOS)
 
 /// The icon in the menu bar and the panel that drops down under it (a status item with a popover).
 @MainActor
@@ -132,3 +148,4 @@ private func snapshot(_ scan: Scan, open: String?, to path: String) {
     guard let png = rep.representation(using: .png, properties: [:]) else { exit(1) }
     try? png.write(to: URL(fileURLWithPath: path))
 }
+#endif

@@ -1,3 +1,4 @@
+#if os(macOS)  // the menu bar panel; Linux and Windows print the list instead (App.swift)
 import AppKit
 import ShelfCore
 import SwiftUI
@@ -15,11 +16,6 @@ private func swatch(_ name: String) -> Color {
                                   "purple": .systemPurple, "indigo": .systemIndigo, "red": .systemRed, "mint": .systemMint,
                                   "cyan": .systemCyan, "yellow": .systemYellow, "green": .systemGreen, "gray": .systemGray]
     return Color(nsColor: map[name] ?? .systemGray)
-}
-
-private func gbText(_ gb: Double) -> String {
-    if gb < 0.1 { return "\(Int((gb * 1000).rounded())) MB" }
-    return gb < 10 ? String(format: "%.1f GB", gb) : "\(Int(gb.rounded())) GB"
 }
 
 struct ShelfView: View {
@@ -212,3 +208,4 @@ struct Pill: View {
             .padding(.horizontal, 6).padding(.vertical, 1).background(Capsule().fill(color))
     }
 }
+#endif

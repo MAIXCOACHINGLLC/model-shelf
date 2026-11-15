@@ -3,13 +3,14 @@ import XCTest
 @testable import ShelfCore
 
 /// Each test builds a fake home folder: model files (sparse, so they cost no disk), launchd jobs pointing at small
-/// scripts, and skills. The scan then runs against that home with no Ollama unless a test fakes one.
+/// scripts, and skills. The scan then runs against that home with no Ollama unless a test fakes one. The launchd reader
+/// runs on every system here; the Linux and Windows readers have their own tests below.
 final class ScannerTests: XCTestCase {
     private var home = ""
     private let fm = FileManager.default
 
     override func setUpWithError() throws {
-        home = fm.temporaryDirectory.appendingPathComponent("shelf-\(UUID().uuidString)").path
+        home = pathOf(fm.temporaryDirectory.appendingPathComponent("shelf-\(UUID().uuidString)"))
         try fm.createDirectory(atPath: home + "/Library/LaunchAgents", withIntermediateDirectories: true)
     }
 
@@ -21,21 +22,21 @@ final class ScannerTests: XCTestCase {
 
     private func write(_ rel: String, _ text: String) throws {
         let path = home + "/" + rel
-        try fm.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+        try fm.createDirectory(at: URL(fileURLWithPath: path).deletingLastPathComponent(), withIntermediateDirectories: true)
         try text.write(toFile: path, atomically: true, encoding: .utf8)
     }
 
     private func model(_ rel: String, mb: Int = 6) throws {
         let path = home + "/" + rel
-        try fm.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+        try fm.createDirectory(at: URL(fileURLWithPath: path).deletingLastPathComponent(), withIntermediateDirectories: true)
         XCTAssertTrue(fm.createFile(atPath: path, contents: nil))
         let h = try XCTUnwrap(FileHandle(forWritingAtPath: path))
         try h.truncate(atOffset: UInt64(mb) * 1_000_000)
         try h.close()
     }
 
-    private func job(_ label: String, runs script: String) throws {
-        let plist: [String: Any] = ["Label": label, "ProgramArguments": ["/bin/zsh", home + "/" + script]]
+    private func job(_ label: String, runs script: String, before: [String] = ["/bin/zsh"]) throws {
+        let plist: [String: Any] = ["Label": label, "ProgramArguments": before + [home + "/" + script]]
         let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
         try data.write(to: URL(fileURLWithPath: home + "/Library/LaunchAgents/\(label).plist"))
     }
@@ -55,7 +56,8 @@ final class ScannerTests: XCTestCase {
         if json.contains("\"models\"") { cfg.models = extra.models }
         if json.contains("\"agents\"") { cfg.agents = extra.agents }
         if json.contains("\"ignoreFiles\"") { cfg.ignoreFiles = extra.ignoreFiles }
-        let env = ScanEnvironment(home: home, loadedJobs: { loaded }, fetchJSON: { url in
+        let h = home
+        let env = ScanEnvironment(home: h, jobs: { Jobs.launchd(home: h, loaded: loaded) }, fetchJSON: { url in
             ollama.first { url.hasSuffix($0.key) }?.value
         })
         return runScan(config: cfg, env: env)
@@ -196,7 +198,7 @@ final class ScannerTests: XCTestCase {
 
     func testOllamaDownIsAWarning() throws {
         let cfg = try JSONDecoder().decode(ShelfConfig.self, from: Data(#"{"hfStores": [], "fileStores": [], "skills": []}"#.utf8))
-        let s = runScan(config: cfg, env: ScanEnvironment(home: home, loadedJobs: { [] }, fetchJSON: { _ in nil }))
+        let s = runScan(config: cfg, env: ScanEnvironment(home: home, jobs: { [] }, fetchJSON: { _ in nil }))
         XCTAssertEqual(s.warnings, ["Ollama is not answering, so its models are not listed."])
     }
 
@@ -240,5 +242,95 @@ final class ScannerTests: XCTestCase {
         try job("com.test.a", runs: "a/worker/run.py")
         try job("com.test.b", runs: "b/worker/run.py")
         XCTAssertEqual(try entry(try scan(), "voice-model").users.count, 2)
+    }
+
+    func testToolFoldersAndHomeItselfAreNotJobFolders() throws {
+        try model("models/m/voice-model.bin")
+        try write(".local/bin/uv", "#!/bin/sh\n")                       // a tool's program: the job is the script after it
+        try write("agents/talk/run.py", "M = 'voice-model.bin'\n")
+        try job("com.test.talk", runs: "agents/talk/run.py", before: [home + "/.local/bin/uv", "run"])
+        try write("loose.sh", "#!/bin/sh\nplay voice-model.bin\n")       // a script right in home: reading home is off limits
+        try job("com.test.loose", runs: "loose.sh")
+        XCTAssertEqual(try entry(try scan(), "voice-model").users.map(\.agent), ["talk"])
+    }
+
+    func testListTextShowsTheSections() throws {
+        try model("models/diffusion_models/pic-model-q4.gguf")
+        try model("models/diffusion_models/stray.gguf", mb: 12)
+        try write("agents/render/run.py", "UNET = 'pic-model-q4.gguf'\n")
+        try job("com.test.render", runs: "agents/render/run.py")
+        let lines = listText(try scan(loaded: ["com.test.render"])).components(separatedBy: "\n")
+        XCTAssertEqual(lines.first, "Models: 18 MB in 2 models")
+        XCTAssertEqual(lines.filter { !$0.isEmpty }.map { $0.split(separator: " ").first.map(String.init) ?? "" },
+                       ["Models:", "Used", "pic-model-q4", "Not", "stray"])
+        XCTAssertTrue(lines.contains { $0.contains("pic-model-q4") && $0.hasSuffix("render") })
+        XCTAssertTrue(lines.contains { $0.contains("stray") && $0.hasSuffix("nothing uses it") })
+        XCTAssertEqual(listText(Scan(entries: [], at: Date(), warnings: [])).prefix(15), "No models found")
+    }
+
+    // MARK: Linux and Windows job readers
+
+    func testSystemdServicesAndTheirTimers() throws {
+        try write(".config/systemd/user/render.service", """
+            [Service]
+            WorkingDirectory=-%h/agents/render
+            ExecStart=/usr/bin/python3 %h/agents/render/run.py --fast
+            """)
+        try write(".config/systemd/user/render.timer", "[Timer]\nOnCalendar=daily\n")
+        try write(".config/systemd/user/chat.service", "[Service]\nExecStart=@%h/.local/bin/chat chat --port 9\n")
+        XCTAssertEqual(Jobs.systemd(home: home, active: ["render.timer"]), [
+            Job(label: "chat", paths: [home + "/.local/bin/chat", "chat", "--port", "9"], loaded: false),  // "@" only strips
+            Job(label: "render", paths: [home + "/agents/render", "/usr/bin/python3", home + "/agents/render/run.py", "--fast"], loaded: true),
+        ])
+    }
+
+    func testCrontabLines() {
+        let text = """
+            # nightly jobs
+            PATH=/usr/local/bin:/usr/bin
+            0 3 * * * cd $HOME/agents/nightly && python3 run.py >> logs/cron.log 2>&1
+            @reboot ~/agents/boot/start.sh
+
+            """
+        XCTAssertEqual(Jobs.crontab(text, home: "/home/me"), [
+            Job(label: "crontab line 3", paths: ["cd", "/home/me/agents/nightly", "&&", "python3", "run.py", ">>", "logs/cron.log", "2>&1"],
+                loaded: true),
+            Job(label: "crontab line 4", paths: ["/home/me/agents/boot/start.sh"], loaded: true),
+        ])
+    }
+
+    func testWindowsScheduledTasks() {
+        let json = #"""
+            [{"name": "Render", "state": "Ready", "exe": "C:\\Python312\\python.exe",
+              "args": "\"%USERPROFILE%\\agents\\my render\\run.py\" --fast", "dir": null},
+             {"name": "Old", "state": "Disabled", "exe": "old.exe", "args": null, "dir": "C:\\Users\\me\\agents\\old"},
+             {"name": "Handler", "state": "Ready"}]
+            """#
+        XCTAssertEqual(Jobs.scheduledTasks(json, home: "C:/Users/me"), [
+            Job(label: "Render", paths: ["C:/Python312/python.exe", "C:/Users/me/agents/my render/run.py", "--fast"], loaded: true),
+            Job(label: "Old", paths: ["C:/Users/me/agents/old", "old.exe"], loaded: false),
+        ])
+        XCTAssertEqual(Jobs.scheduledTasks("", home: "C:/Users/me"), [])
+    }
+
+    func testWordsKeepQuotedPartsTogether() {
+        XCTAssertEqual(Jobs.words(#"python "my dir/run.py" --x='a b' plain\ space  "#), ["python", "my dir/run.py", "--x=a b", "plain space"])
+        XCTAssertEqual(Jobs.words(""), [])
+    }
+
+    func testGlobMatchesLikeFnmatch() {
+        let cases: [(String, String, Bool)] = [
+            ("tests/*", "tests/a/b.py", true), ("*/tests/*", "x/tests/y.py", true), ("*/tests/*", "tests/y.py", false),
+            ("models/diffusion_models/pic-*", "models/diffusion_models/pic-model.gguf", true), ("a?c", "abc", true),
+            ("a?c", "ac", false), ("[!x]bc", "abc", true), ("[a-c]z", "dz", false), ("[]x]", "]", true),
+            ("ollama/qwen*", "ollama/qwen3:8b", true), ("*", "", true), ("", "a", false), (#"a\*"#, "a*", true),
+            (#"a\*"#, "ab", false), ("*.gguf", "dir/x.gguf", true),
+        ]
+        for (p, t, want) in cases {
+            XCTAssertEqual(glob(p, t), want, "\(p) on \(t)")
+            #if !os(Windows)
+            XCTAssertEqual(fnmatch(p, t, 0) == 0, want, "fnmatch \(p) on \(t)")
+            #endif
+        }
     }
 }

@@ -17,7 +17,7 @@ public struct ShelfConfig: Decodable {
     }
 
     public var hfStores: [String] = ["~/.cache/huggingface/hub"]
-    public var fileStores: [String] = ["~/ComfyUI/models", "~/.lmstudio/models"]
+    public var fileStores: [String] = ["~/ComfyUI/models", "~/Documents/ComfyUI/models", "~/.lmstudio/models"]  // ComfyUI by hand, the ComfyUI app, LM Studio
     public var ollama: String? = "http://127.0.0.1:11434"
     public var skills: [String] = ["~/.claude/skills"]
     public var skipAgents: [String] = []
@@ -82,4 +82,36 @@ public struct Scan: Codable {
         self.at = at
         self.warnings = warnings
     }
+}
+
+/// Sizes the way the panel shows them: "480 MB", "1.6 GB", "30 GB".
+public func gbText(_ gb: Double) -> String {
+    if gb < 0.1 { return "\(Int((gb * 1000).rounded())) MB" }
+    return gb < 10 ? String(format: "%.1f GB", gb) : "\(Int(gb.rounded())) GB"
+}
+
+/// The scan as plain text for a terminal: the same sections as the panel, one line per model.
+public func listText(_ scan: Scan) -> String {
+    let total = scan.entries.reduce(0) { $0 + $1.gb }
+    var out = scan.warnings.map { "Note: " + $0 }
+    guard !scan.entries.isEmpty else {
+        return (out + ["No models found. The README shows how to point Model Shelf at your model folders."]).joined(separator: "\n")
+    }
+    out.append("Models: \(gbText(total)) in \(scan.entries.count) model\(scan.entries.count == 1 ? "" : "s")")
+    let width = min(40, scan.entries.map(\.name.count).max() ?? 0)
+    func pad(_ s: String, _ n: Int, left: Bool = false) -> String {
+        let fill = String(repeating: " ", count: max(0, n - s.count))
+        return left ? fill + s : s + fill
+    }
+    for (id, title) in [("used", "Used"), ("idle", "Idle"), ("unused", "Not used")] {
+        let list = scan.entries.filter { $0.section == id }
+        guard !list.isEmpty else { continue }
+        out += ["", "\(title) (\(gbText(list.reduce(0) { $0 + $1.gb })))"]
+        for e in list {
+            let names = e.users.map(\.agent)
+            let who = !names.isEmpty ? names.joined(separator: ", ") : (e.loaded ? "in memory now, nothing names it" : "nothing uses it")
+            out.append("  " + pad(e.name, width) + "  " + pad(gbText(e.gb), 7, left: true) + "  " + who)
+        }
+    }
+    return out.joined(separator: "\n")
 }

@@ -3,9 +3,11 @@ on:
   push:
     branches: [main]
   pull_request:
+
+# Each system builds, runs the tests, and then finds a real model file and the scheduled job that uses it.
+# The jobs run only once the repository is public (minutes on a private repository are billed).
 jobs:
-  test:
-    # Runs only once the repository is public (macOS minutes on a private repository are billed).
+  macos:
     if: ${{ !github.event.repository.private }}
     runs-on: macos-15
     steps:
@@ -13,3 +15,62 @@ jobs:
       - run: swift build
       - run: swift test
       - run: ./scripts/build-app.sh
+      - name: Find a model and the launchd job that uses it
+        run: |
+          mkdir -p ~/ComfyUI/models/diffusion_models ~/agents/render ~/Library/LaunchAgents
+          mkfile -n 6m ~/ComfyUI/models/diffusion_models/demo-model-q4.gguf
+          echo "UNET = 'demo-model-q4.gguf'" > ~/agents/render/run.py
+          plutil -create xml1 ~/Library/LaunchAgents/demo.render.plist
+          plutil -insert Label -string demo.render ~/Library/LaunchAgents/demo.render.plist
+          plutil -insert ProgramArguments -array ~/Library/LaunchAgents/demo.render.plist
+          plutil -insert ProgramArguments.0 -string "$HOME/agents/render/run.py" ~/Library/LaunchAgents/demo.render.plist
+          out="$("build/Model Shelf.app/Contents/MacOS/ModelShelf" --list)"
+          echo "$out"
+          echo "$out" | grep demo-model-q4 | grep -q render
+
+  linux:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    container: swift:6.4.2-noble
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift build
+      - run: swift test
+      - name: Find a model and the systemd service and cron line that use it
+        run: |
+          apt-get update -qq && apt-get install -y -qq cron > /dev/null
+          mkdir -p ~/ComfyUI/models/diffusion_models ~/agents/render ~/agents/nightly ~/.config/systemd/user
+          truncate -s 6M ~/ComfyUI/models/diffusion_models/demo-model-q4.gguf
+          echo "UNET = 'demo-model-q4.gguf'" > ~/agents/render/run.py
+          echo "M = 'demo-model-q4.gguf'" > ~/agents/nightly/run.py
+          printf '[Service]\nExecStart=/usr/bin/python3 %%h/agents/render/run.py\n' > ~/.config/systemd/user/render.service
+          echo "0 3 * * * python3 $HOME/agents/nightly/run.py" | crontab -
+          out="$("$(swift build --show-bin-path)/ModelShelf")"
+          echo "$out"
+          echo "$out" | grep demo-model-q4 | grep render | grep -q nightly
+
+  windows:
+    if: ${{ !github.event.repository.private }}
+    runs-on: windows-latest
+    steps:
+      - uses: compnerd/gha-setup-swift@v0.5.1
+        with:
+          swift-version: swift-6.4.2-release
+          swift-build: 6.4.2-RELEASE
+      - uses: actions/checkout@v4
+      - run: swift build
+      - run: swift test
+      - name: Find a model and the scheduled task that uses it
+        shell: pwsh
+        run: |
+          $models = "$env:USERPROFILE\ComfyUI\models\diffusion_models"
+          $agent = "$env:USERPROFILE\agents\render"
+          New-Item -ItemType Directory -Force $models, $agent | Out-Null
+          $f = [IO.File]::Create("$models\demo-model-q4.gguf"); $f.SetLength(6MB); $f.Close()
+          Set-Content "$agent\run.py" "UNET = 'demo-model-q4.gguf'"
+          $action = New-ScheduledTaskAction -Execute "python.exe" -Argument "`"$agent\run.py`""
+          Register-ScheduledTask -TaskName "ModelShelfDemo" -Action $action -Trigger (New-ScheduledTaskTrigger -Daily -At 3am) | Out-Null
+          $bin = swift build --show-bin-path
+          $out = & "$bin\ModelShelf.exe" | Out-String
+          $out
+          if ($out -notmatch 'demo-model-q4.*render') { throw "Model Shelf did not find the scheduled task that uses the model" }
