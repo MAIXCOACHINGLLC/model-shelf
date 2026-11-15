@@ -81,7 +81,7 @@ final class MenuBar: NSObject, NSApplicationDelegate {
         if popover.isShown { popover.performClose(nil); return }
         shelf.refreshIfOld()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         popover.contentViewController?.view.window?.makeKey()
     }
 }

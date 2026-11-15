@@ -176,7 +176,7 @@ final class ScannerTests: XCTestCase {
         try write("renderer/tools/tts.py", "CLONE = 'clone-voice.bin'\n")
         try write("renderer/worker.py", "print('worker')\n")
         try job("com.test.renderer", runs: "renderer/worker.py")
-        try write("clips/make.sh", "#!/bin/sh\npython tools/tts.py --design\n")
+        try write("clips/make.sh", "#!/bin/sh\npython ~/renderer/tools/tts.py --design\n")
         try job("com.test.clips", runs: "clips/make.sh")
         let cfg = #"{"models": [{"id": "c", "name": "Clone", "kind": "Voice", "match": ["models/m/clone-*"], "what": "x", "notUsedBy": ["clips"]}]}"#
         XCTAssertEqual(try entry(try scan(cfg), "Clone").users.map(\.agent), ["renderer"])
@@ -218,5 +218,27 @@ final class ScannerTests: XCTestCase {
         try model("models/hub/blobs/abc")            // a cache living inside the model folder
         try write("models/hub/CACHEDIR.TAG", "Signature: 8a477f597d28d172789f06886806bc55\n")
         XCTAssertEqual(try scan().entries.map(\.name), ["pic-model-q4"])
+    }
+
+    func testHopNeedsTheWholeFolderName() throws {
+        try model("models/m/voice-model.bin")
+        try write("renderer/tools/tts.py", "MODEL = 'voice-model.bin'\n")
+        try write("renderer/worker.py", "print('worker')\n")
+        try job("com.test.renderer", runs: "renderer/worker.py")
+        try write("other/run.sh", "#!/bin/sh\npython ~/other/mytools/tts.py\n")
+        try job("com.test.other", runs: "other/run.sh")
+        try write("skills/video/scripts/v.py", "M = 'voice-model.bin'\n")
+        try write("clips/run.sh", "#!/bin/sh\ncat ~/.claude/skills/video-skills/SKILL.md\n")
+        try job("com.test.clips", runs: "clips/run.sh")
+        XCTAssertEqual(Set(try entry(try scan(), "voice-model").users.map(\.agent)), ["renderer", "video skill"])
+    }
+
+    func testSameFolderNameInTwoPlacesKeepsBoth() throws {
+        try model("models/m/voice-model.bin")
+        try write("a/worker/run.py", "M = 'voice-model.bin'\n")
+        try write("b/worker/run.py", "M = 'voice-model.bin'\n")
+        try job("com.test.a", runs: "a/worker/run.py")
+        try job("com.test.b", runs: "b/worker/run.py")
+        XCTAssertEqual(try entry(try scan(), "voice-model").users.count, 2)
     }
 }

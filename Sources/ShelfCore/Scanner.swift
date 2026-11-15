@@ -27,7 +27,9 @@ public struct ScanEnvironment {
 }
 
 public func runScan(config: ShelfConfig, env: ScanEnvironment = .live) -> Scan {
-    Scanner(cfg: config, env: env).scan()
+    var buf = [CChar](repeating: 0, count: Int(PATH_MAX))
+    let real = realpath(env.home, &buf) != nil ? String(cString: buf) : env.home  // keeps /private, unlike URL's resolve
+    return Scanner(cfg: config, env: env, realHome: real).scan()
 }
 
 private struct Item {
@@ -100,14 +102,13 @@ private func size(_ path: String) -> Int64 {
 private struct Scanner {
     let cfg: ShelfConfig
     let env: ScanEnvironment
+    let realHome: String                 // home with links resolved (/var is /private/var on a Mac)
 
     func expand(_ p: String) -> String { p.hasPrefix("~/") ? env.home + p.dropFirst(1) : p }
 
-    // The path after home, whether it came in as written or with links resolved (/var is /private/var on a Mac).
+    // The path after home, whether it came in as written or with links resolved.
     func afterHome(_ p: String) -> String? {
-        var buf = [CChar](repeating: 0, count: Int(PATH_MAX))
-        let real = realpath(env.home, &buf) != nil ? String(cString: buf) : env.home  // keeps /private, unlike URL's resolve
-        for h in [env.home, real] where p.hasPrefix(h + "/") { return String(p.dropFirst(h.count + 1)) }
+        for h in [env.home, realHome] where p.hasPrefix(h + "/") { return String(p.dropFirst(h.count + 1)) }
         return nil
     }
     func tilde(_ p: String) -> String { afterHome(p).map { "~/" + $0 } ?? p }
@@ -217,6 +218,9 @@ private struct Scanner {
             Agent(name: cfg.agents[tilde(root)] ?? (root as NSString).lastPathComponent, root: root,
                   tag: live ? "job" : "job (not loaded)", skillName: nil)
         }
+        // Two job folders with the same name: show where each one is, so neither hides the other.
+        let counts = Dictionary(grouping: list, by: \.name).mapValues(\.count)
+        list = list.map { counts[$0.name, default: 0] > 1 ? Agent(name: "\($0.name) (\(tilde($0.root)))", root: $0.root, tag: $0.tag, skillName: nil) : $0 }
         for skills in cfg.skills.map(expand) {
             for s in ((try? fm.contentsOfDirectory(atPath: skills)) ?? []).sorted() where !s.hasPrefix(".") {
                 var isDir: ObjCBool = false
@@ -310,7 +314,7 @@ private struct Scanner {
             if let s = a.skillName { viaSkill.append((i, s)) }
             let parts = f.rel.split(separator: "/")
             if parts.count >= 2, scriptExts.contains((f.rel as NSString).pathExtension.lowercased()) {
-                hopKeys[parts.suffix(2).joined(separator: "/"), default: []].append((i, fi))
+                hopKeys["/" + parts.suffix(2).joined(separator: "/"), default: []].append((i, fi))  // "/tools/tts.py", not "mytools/tts.py"
             }
         }
         // One more hop: a job or skill that runs a script which names the model.
@@ -318,17 +322,17 @@ private struct Scanner {
             let a = ags[files[gi].agent]
             for key in keys {
                 for (i, fi) in hopKeys[key] ?? [] where files[fi].agent != files[gi].agent {
-                    users[i].append(User(agent: a.name, how: "runs \(ags[files[fi].agent].name)'s \(key)", tag: a.tag))
+                    users[i].append(User(agent: a.name, how: "runs \(ags[files[fi].agent].name)'s \(key.dropFirst())", tag: a.tag))
                     if let s = a.skillName { viaSkill.append((i, s)) }
                 }
             }
         }
         // A job that runs a skill which uses the model.
         let jobFiles = files.filter { !ags[$0.agent].isSkill }
-        for (gi, keys) in grep(Array(Set(viaSkill.map { "skills/" + $0.skill })), in: jobFiles) {
+        for (gi, keys) in grep(Array(Set(viaSkill.map { "skills/" + $0.skill + "/" })), in: jobFiles) {  // "video/" is not "video-skills/"
             let a = ags[jobFiles[gi].agent]
             for key in keys {
-                let s = String(key.dropFirst("skills/".count))
+                let s = String(key.dropFirst("skills/".count).dropLast())
                 for (i, sk) in viaSkill where sk == s {
                     users[i].append(User(agent: a.name, how: "runs the \(cfg.skillNames[s] ?? s + " skill")", tag: a.tag))
                 }
@@ -338,6 +342,7 @@ private struct Scanner {
         // Group items into the models the settings describe; anything else is new.
         var claimed = Set<Int>()
         var entries: [Entry] = []
+        var usedIds = Set<String>()
         func make(_ m: ShelfConfig.Model?, _ idx: [Int]) -> Entry {
             let its = idx.map { items[$0] }
             var seen = Set<String>()
@@ -352,7 +357,9 @@ private struct Scanner {
                     .replacingOccurrences(of: "--", with: "/") as NSString).deletingPathExtension
             let icons = ["Text reader": "text.alignleft", "Add-on": "puzzlepiece", "Image decoder": "photo",
                          "Sound reader": "waveform", "Writing": "text.bubble", "Picture or video model": "photo.on.rectangle"]
-            return Entry(id: m?.id ?? first.key, name: m?.name ?? fallbackName, kind: m?.kind ?? first.defaultKind,
+            var id = m?.id ?? first.key
+            while !usedIds.insert(id).inserted { id += "+" }  // a repeated id in the settings must not merge two rows
+            return Entry(id: id, name: m?.name ?? fallbackName, kind: m?.kind ?? first.defaultKind,
                          icon: m?.icon ?? icons[first.defaultKind] ?? "shippingbox", color: m?.color ?? "gray",
                          what: m?.what ?? "Found on disk. No description yet.", gb: its.reduce(0) { $0 + $1.gb },
                          store: first.store, users: us, section: section, loaded: loaded, isNew: m == nil, note: m?.note,

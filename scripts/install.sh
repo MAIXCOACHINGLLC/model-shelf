@@ -9,20 +9,17 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 ./scripts/build-app.sh
 mkdir -p "$HOME/Applications" "$HOME/Library/LaunchAgents"
 rm -rf "$APP" && cp -R "build/Model Shelf.app" "$APP"
-cat > "$PLIST" <<PLISTEOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>$LABEL</string>
-  <key>ProgramArguments</key><array><string>$APP/Contents/MacOS/ModelShelf</string></array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
-  <key>LimitLoadToSessionType</key><string>Aqua</string>
-  <key>ProcessType</key><string>Interactive</string>
-</dict>
-</plist>
-PLISTEOF
+# Built with plutil so any characters in the path are written safely.
+rm -f "$PLIST"
+plutil -create xml1 "$PLIST"
+plutil -insert Label -string "$LABEL" "$PLIST"
+plutil -insert ProgramArguments -array "$PLIST"
+plutil -insert ProgramArguments.0 -string "$APP/Contents/MacOS/ModelShelf" "$PLIST"
+plutil -insert RunAtLoad -bool YES "$PLIST"
+plutil -insert KeepAlive -dictionary "$PLIST"
+plutil -insert KeepAlive.SuccessfulExit -bool NO "$PLIST"
+plutil -insert LimitLoadToSessionType -string Aqua "$PLIST"
+plutil -insert ProcessType -string Interactive "$PLIST"
 if launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1; then
   launchctl kickstart -k "gui/$(id -u)/$LABEL"
 else
