@@ -41,10 +41,12 @@ machine, and it keeps nothing but file paths.
 - **Read only.** It never moves, changes or deletes a file and never starts or stops a job. The scan writes no
   temporary files. Results stay in memory; `--scan` and `--list` print to the terminal.
 - **Local only.** Nothing leaves the machine. No telemetry, no accounts, no update checks.
-- **Private folders are skipped.** No code is read in `Desktop`, `Documents`, `Downloads`, `Pictures`, `Movies`,
-  `Music`, `Videos`, `Library`, `AppData`, `Applications`, `Public` or `snap`, in hidden folders, or in data folders
-  such as `data`, `state`, `logs`, `runs`, `out`, `cache` (`privateFolders` and `skipDirs` in `Scanner.swift`). In a
-  git repository only tracked files are read. Model folders named in the settings are listed, not read.
+- **Private folders are skipped.** A job's folder is never in `Desktop`, `Documents`, `Downloads`, `Pictures`,
+  `Movies`, `Music`, `Videos`, `Library`, `AppData`, `Applications`, `Public` or `snap`, or in a hidden folder
+  (`privateFolders` in `Scanner.swift`). The one exception is on purpose: the skill folders named in the settings
+  (`~/.claude/skills` by default) are read. In every job and skill folder, data folders such as `data`, `state`,
+  `logs`, `runs`, `out`, `cache` are skipped (`skipDirs`). In a git repository only tracked files are read when git
+  is installed. Model folders named in the settings are listed, not read.
 - **It keeps paths, not contents.** The scan looks only for model names and keeps only the paths of matching files.
 - **Personal data.** A real scan holds a machine's folder paths and job names, which can include a user name. Never put
   one in an issue, a commit, a test or a screenshot; use `docs/demo-scan.json` and fake home folders. Model Shelf has
@@ -54,8 +56,9 @@ machine, and it keeps nothing but file paths.
 
 - No third-party Swift packages: only the system libraries (Foundation, AppKit, SwiftUI, XCTest). Adding one is a recorded decision
   (ARCHITECTURE.md Decision Log) and must keep the read-only, local-only promise.
-- CI pins its outside pieces: `actions/checkout@v4`, `compnerd/gha-setup-swift@v0.5.1`, the `swift:6.4.2-noble`
-  container and Swift 6.4.2 on Windows. A pin moves like any other change: one commit, and the message says why.
+- CI names its outside pieces by version: `actions/checkout@v4` (follows the latest v4 release),
+  `compnerd/gha-setup-swift@v0.5.1`, the `swift:6.4.2-noble` container and Swift 6.4.2 on Windows. A version moves like
+  any other change: one commit, and the message says why.
 
 ## Reporting a problem
 

@@ -74,8 +74,8 @@ System font everywhere; sizes in points. Numbers use monospaced digits.
 - **Model row.** Icon tile, name with "Loaded" and "New" pills, a one-line subtitle (who uses it, or "Nothing uses
   it", "New on disk", "In memory now, no job names it"), size, and a chevron that turns 90 degrees when open. Click to
   open; one row open at a time.
-- **Row detail.** What the model does, "Used by" (or "Can be used by" for Idle) with one line per job or skill, the
-  note from the settings, and the store path.
+- **Row detail.** What the model does, "Used by" (or "Can be used by" for an Idle model with users) with one line
+  per job or skill ("Nothing uses it now" when there are none), the note from the settings, and the store path.
 - **Footer.** "Checked 3:42 PM · only reads" and a Quit button.
 - **Kind icons** (SF Symbols, when the settings give none): `photo.on.rectangle` picture or video model,
   `text.alignleft` text reader, `puzzlepiece` add-on, `photo` image decoder, `waveform` sound reader, `text.bubble`

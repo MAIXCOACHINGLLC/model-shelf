@@ -40,8 +40,8 @@ scheduled jobs, skills ────┘                          ├──> --lis
    (`CACHEDIR.TAG`) is skipped. Ollama: `/api/tags` for what it holds and `/api/ps` for what is loaded now.
 3. **Agents.** Each scheduled job becomes the folder it runs from: the first of its paths inside home and outside
    private folders, raised to its git root when there is one, never home itself. Each skill folder is an agent too.
-4. **Code files.** In a git repository, `git ls-files`; otherwise a folder walk. Data folders, ignored files
-   (`ignoreFiles`), non-code files, files of 512 KB or more and binary files are left out.
+4. **Code files.** In a git repository, `git ls-files` (when git is installed); otherwise a folder walk. Data
+   folders, ignored files (`ignoreFiles`), non-code files, files of 512 KB or more and binary files are left out.
 5. **Name search.** An in-app fixed-string search, like `grep -o -F`: the longest name wins at each spot, and names
    shorter than 6 characters are not searched.
 6. **Links.** A file that names a model makes its job or skill a user. One more step: a job that runs that script
@@ -88,10 +88,10 @@ settings), `PATH` (finding git on Linux and Windows), `SystemRoot` (finding Powe
 |---|---|---|---|
 | 2026-11-15 | Read only and local only: no writes, no job control, no network except a local Ollama, no telemetry (commit `2f8fad4`, README "Safety and privacy") | Safety and privacy: it looks through a machine's model folders and job code (README) | TBD – confirm |
 | 2026-11-15 | A Mac menu bar app (status item and popover, no Dock icon), installed in `~/Applications` with a launchd login item that restarts it after a crash (commit `2f8fad4`, `scripts/install.sh`) | Always current at a glance; no admin rights needed (README) | TBD – confirm |
-| 2026-11-15 | No third-party dependencies (README "Install") | TBD – confirm | TBD – confirm |
+| 2026-11-15 | No third-party dependencies (`Package.swift` has none since commit `2f8fad4`; README "Install" since `8fc8937`) | TBD – confirm | TBD – confirm |
 | 2026-11-15 | Links between jobs need whole names: a one-step link needs the whole folder name, a skill link the whole skill name; same-named job folders both show; repeated settings ids do not merge; the login item is written with `plutil` (commit `9062cb8`) | Found in review: partial names linked the wrong jobs, and unusual characters could break the login item | Matching on part of a name, which was replaced |
 | 2026-11-15 | Run on Linux and Windows: one job reader per system, the name search and wildcard matching inside the app, paths joined with "/"; the panel stays Mac only and the other systems print a list (commit `8fc8937`) | The scan used Mac-only pieces | `/usr/bin/grep`, `fnmatch`, `realpath` and `NSString` paths, which were replaced |
-| 2026-11-15 | A job's folder is never home itself or a hidden tool folder, and the scan writes no temporary file (commit `8fc8937`) | A job starting `~/.local/bin/uv`, or a script right in home, could make the scan read far too much | TBD – confirm |
-| 2026-11-15 | CI builds, tests and runs a real end-to-end find on macOS, Linux and Windows, only while the repository is public (commit `8fc8937`, `ci.yml`) | CI is the proof for systems nobody runs by hand; minutes on a private repository are billed | TBD – confirm |
+| 2026-11-15 | A job's folder is never home itself or a hidden tool folder, and the scan writes no temporary file (commit `8fc8937`) | A job starting `~/.local/bin/uv`, or a script right in home, could make the scan read far too much. Why no temporary file: TBD – confirm | TBD – confirm |
+| 2026-11-15 | CI builds, tests and runs a real end-to-end find on macOS, Linux and Windows, only while the repository is public (public-only Mac CI since commit `2f8fad4`; all three systems since `8fc8937`; `ci.yml`) | CI is the proof for systems nobody runs by hand; minutes on a private repository are billed | TBD – confirm |
 | 2026-11-15 | One small folder walk instead of FileManager's enumerator (commit `3e3e517`) | CI on Linux and Windows caught a crash and a skipped-models bug in the enumerator path | FileManager's enumerator, which was replaced |
 | 2026-11-16 | One root AGENTS.md; CLAUDE.md is the single line `@AGENTS.md`; SECURITY.md, ARCHITECTURE.md and DESIGN_SYSTEM.md added | One rulebook for every coding tool, and docs that move with the code | A full CLAUDE.md beside AGENTS.md (two rulebooks drift) |
