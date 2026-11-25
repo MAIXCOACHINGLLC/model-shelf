@@ -5,10 +5,10 @@ import SwiftUI
 
 // MARK: - Look
 
-private let sections: [(id: String, name: String, color: Color)] = [
-    ("used", "Used", Color(nsColor: .systemGreen)),
-    ("idle", "Idle", Color(nsColor: .systemOrange)),
-    ("unused", "Not used", Color(nsColor: .systemGray)),
+private let sections: [(id: String, name: String, hint: String, color: Color)] = [
+    ("used", "In use", "A job or skill uses these", Color(nsColor: .systemGreen)),
+    ("idle", "Resting", "Kept, but nothing runs them now", Color(nsColor: .systemOrange)),
+    ("unused", "Leftovers", "Nothing uses these", Color(nsColor: .systemGray)),
 ]
 
 private func swatch(_ name: String) -> Color {
@@ -35,13 +35,16 @@ struct ShelfView: View {
                         ForEach(sections, id: \.id) { sec in
                             let list = scan.entries.filter { $0.section == sec.id }
                             if !list.isEmpty {
-                                HStack {
-                                    Text(sec.name)
-                                    Spacer()
-                                    Text(gbText(list.reduce(0) { $0 + $1.gb })).monospacedDigit()
+                                VStack(alignment: .leading, spacing: 1) {
+                                    HStack {
+                                        Text(sec.name)
+                                        Spacer()
+                                        Text(gbText(list.reduce(0) { $0 + $1.gb })).monospacedDigit()
+                                    }
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                    Text(sec.hint).font(.system(size: 10.5)).foregroundStyle(.tertiary)
                                 }
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(.secondary)
                                 .padding(.horizontal, 10).padding(.top, 10).padding(.bottom, 2)
                                 ForEach(list) { e in
                                     ModelRow(entry: e, isOpen: open == e.id) {
@@ -135,11 +138,19 @@ struct ModelRow: View {
     let toggle: () -> Void
     @State private var hover = false
 
+    // What it does in a few words (from the settings), then who uses it; a new download says when it arrived.
     private var subtitle: String {
         if entry.loaded && entry.users.isEmpty { return "In memory now, no job names it" }
-        if entry.section == "unused" { return entry.isNew ? "New on disk" : "Nothing uses it" }
         let jobs = entry.users.filter { $0.tag != "skill" }.map(\.agent)
         let names = jobs.isEmpty ? entry.users.map(\.agent) : jobs
+        if let does = entry.does {
+            guard entry.section == "used", let first = names.first else { return does }
+            return does + " · " + first + (names.count > 1 ? " +\(names.count - 1)" : "")
+        }
+        if entry.section == "unused" {
+            guard entry.isNew else { return "Nothing uses it" }
+            return "New on disk" + (entry.added.map { " · " + $0.formatted(.dateTime.month(.abbreviated).day()) } ?? "")
+        }
         if names.isEmpty { return "Nothing calls it now" }
         return (entry.section == "idle" ? "Can be used by " : "") + names.prefix(2).joined(separator: ", ") + (names.count > 2 ? " +\(names.count - 2)" : "")
     }
@@ -193,6 +204,9 @@ struct ModelRow: View {
             }
             if let note = entry.note {
                 Text(note).font(.system(size: 11.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            if let tech = entry.tech {
+                Text(tech).font(.system(size: 11, design: .monospaced)).foregroundStyle(.tertiary).textSelection(.enabled)
             }
             Text(entry.store).font(.system(size: 11, design: .monospaced)).foregroundStyle(.tertiary).textSelection(.enabled)
         }

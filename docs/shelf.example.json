@@ -10,7 +10,9 @@
   "models": [
     {
       "id": "whisper",
-      "name": "Whisper large-v3-turbo",
+      "name": "Ears",
+      "tech": "Whisper large-v3-turbo",
+      "does": "Writes down every word",
       "kind": "Hearing",
       "icon": "ear",
       "color": "orange",
@@ -19,7 +21,9 @@
     },
     {
       "id": "qwen-image",
-      "name": "Qwen-Image",
+      "name": "Picture maker",
+      "tech": "Qwen-Image",
+      "does": "Makes every still",
       "kind": "Pictures",
       "icon": "photo",
       "color": "blue",

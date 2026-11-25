@@ -17,8 +17,8 @@ below are the ones in the code. Change them there and here in the same commit.
 | Use | Color |
 |---|---|
 | Used (its usage bar segment and legend swatch) | `systemGreen` |
-| Idle | `systemOrange` |
-| Not used | `systemGray` |
+| Resting (section id `idle`) | `systemOrange` |
+| Leftovers (section id `unused`) | `systemGray` |
 | Model icon tile | the model's `color` from the settings: `pink`, `orange`, `blue`, `teal`, `purple`, `indigo`, `red`, `mint`, `cyan`, `yellow`, `green`, `gray` (the matching `system*` color); default `gray` |
 | "Loaded" pill | `.blue` |
 | "New" pill | `.purple` |
@@ -39,6 +39,7 @@ System font everywhere; sizes in points. Numbers use monospaced digits.
 | Panel title "Models" | 15 bold |
 | Header total ("30 GB · 12 models") | 12, secondary |
 | Section header (name and total) | 11 semibold, secondary |
+| Section hint ("Nothing uses these") | 10.5, tertiary, under the header, 1 apart |
 | Model name | 13 semibold, one line |
 | Row subtitle | 11, secondary, one line |
 | Row size | 12, secondary |
@@ -46,7 +47,7 @@ System font everywhere; sizes in points. Numbers use monospaced digits.
 | "Used by" label | 11 semibold, secondary |
 | Used-by line | 12: name semibold, how secondary |
 | Note | 11.5, secondary |
-| Store path | 11 monospaced, tertiary, selectable |
+| Technical name, store path | 11 monospaced, tertiary, selectable |
 | Legend, warnings, footer | 11 (secondary; warnings orange) |
 | Pill | 10 bold, white |
 | Icon in tile / refresh icon / chevron | 13 semibold / 11 semibold / 10 bold tertiary |
@@ -70,12 +71,15 @@ System font everywhere; sizes in points. Numbers use monospaced digits.
 
 - **Header.** Title, total size and count, refresh button (`arrow.clockwise`, help text "Check again", spins while a
   scan runs), the usage bar split by section, the legend, then any warnings (`exclamationmark.triangle`).
-- **Section.** Used, Idle, Not used, in that order, each with its total. Empty sections are hidden.
-- **Model row.** Icon tile, name with "Loaded" and "New" pills, a one-line subtitle (who uses it, or "Nothing uses
-  it", "New on disk", "In memory now, no job names it"), size, and a chevron that turns 90 degrees when open. Click to
-  open; one row open at a time.
-- **Row detail.** What the model does, "Used by" (or "Can be used by" for an Idle model with users) with one line
-  per job or skill ("Nothing uses it now" when there are none), the note from the settings, and the store path.
+- **Section.** In use ("A job or skill uses these"), Resting ("Kept, but nothing runs them now"), Leftovers
+  ("Nothing uses these"), in that order, each with its total and its hint. Empty sections are hidden.
+- **Model row.** Icon tile, name with "Loaded" and "New" pills, a one-line subtitle, size, and a chevron that turns 90
+  degrees when open. Click to open; one row open at a time. Subtitle, first match wins: "In memory now, no job names
+  it"; the settings' `does`, plus " · " and the first job (and "+N") when In use; "New on disk · Nov 16" (the date the
+  files arrived, when known) or "Nothing uses it" for a Leftover; otherwise who uses it.
+- **Row detail.** What the model does, "Used by" (or "Can be used by" for a Resting model with users) with one line
+  per job or skill ("Nothing uses it now" when there are none), the note from the settings, the technical name (when
+  the settings give one) and the store path.
 - **Footer.** "Checked 3:42 PM · only reads" and a Quit button.
 - **Kind icons** (SF Symbols, when the settings give none): `photo.on.rectangle` picture or video model,
   `text.alignleft` text reader, `puzzlepiece` add-on, `photo` image decoder, `waveform` sound reader, `text.bubble`
@@ -88,7 +92,7 @@ System font everywhere; sizes in points. Numbers use monospaced digits.
 
 ## Words and numbers
 
-- Plain words, no jargon: "Used", "Idle", "Not used", "Check again", "Reading the disk", "only reads".
+- Plain words, no jargon: "In use", "Resting", "Leftovers", "Check again", "Reading the disk", "only reads".
 - Sizes from `gbText`: under 0.1 GB in MB ("480 MB"), under 10 GB with one decimal ("1.6 GB"), else whole ("30 GB").
 
 ## Terminal list (Linux, Windows, `--list`)

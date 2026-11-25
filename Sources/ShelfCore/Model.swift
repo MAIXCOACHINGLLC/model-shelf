@@ -5,7 +5,9 @@ import Foundation
 public struct ShelfConfig: Decodable {
     public struct Model: Decodable {
         public let id: String
-        public let name: String
+        public let name: String          // a plain name people know it by, e.g. "Picture maker"
+        public let tech: String?         // the technical name, shown small in the detail
+        public let does: String?         // a few words on what it does, shown on the row
         public let kind: String
         public let icon: String?         // SF Symbol name
         public let color: String?        // pink, orange, blue, teal, purple, indigo, red, mint, cyan, yellow, green, gray
@@ -58,10 +60,13 @@ public struct User: Codable, Hashable {
 public struct Entry: Codable, Identifiable {
     public let id: String
     public let name: String
+    public let tech: String?             // from the settings
+    public let does: String?             // from the settings
     public let kind: String
     public let icon: String
     public let color: String
     public let what: String
+    public let added: Date?              // when its oldest file or folder appeared on disk, if the system says
     public let gb: Double
     public let store: String
     public let users: [User]
@@ -103,7 +108,7 @@ public func listText(_ scan: Scan) -> String {
         let fill = String(repeating: " ", count: max(0, n - s.count))
         return left ? fill + s : s + fill
     }
-    for (id, title) in [("used", "Used"), ("idle", "Idle"), ("unused", "Not used")] {
+    for (id, title) in [("used", "In use"), ("idle", "Resting"), ("unused", "Leftovers")] {
         let list = scan.entries.filter { $0.section == id }
         guard !list.isEmpty else { continue }
         out += ["", "\(title) (\(gbText(list.reduce(0) { $0 + $1.gb })))"]

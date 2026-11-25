@@ -47,6 +47,7 @@ private struct Item {
     let ids: [String]                // strings that name this model in code
     let gb: Double
     let defaultKind: String
+    var added: Date? = nil
 }
 
 private struct Agent {
@@ -65,6 +66,8 @@ private struct SourceFile {
 
 private let codeExts: Set<String> = ["py", "sh", "zsh", "bash", "js", "mjs", "cjs", "ts", "json", "toml", "yaml", "yml", "plist", "swift"]
 private let scriptExts: Set<String> = ["py", "sh", "zsh", "bash", "js", "mjs", "cjs", "ts", ""]
+// Files in a model folder that are never models, however big: download logs, notes, settings.
+private let notModelExts: Set<String> = ["log", "txt", "md", "json", "lock", "csv", "html"]
 private let skipDirs: Set<String> = [".git", "node_modules", ".venv", "venv", "__pycache__", "runs", "next-runs", "state", "logs",
                                      "out", "projects", "site-packages", "data", "cache", "tmp", "build", "dist", ".wrangler"]
 // Folders in home whose code is never read, compared in lower case (Mac and Windows names ignore case). Hidden
@@ -114,6 +117,9 @@ private func getJSON(_ url: String) -> [String: Any]? {
     _ = done.wait(timeout: .now() + 4)
     return result
 }
+
+// When a file or folder was made, if the system keeps that date.
+private func created(_ path: String) -> Date? { (try? fm.attributesOfItem(atPath: path))?[.creationDate] as? Date }
 
 // A regular file's size; 0 for a folder, a link or anything else.
 private func size(_ path: String) -> Int64 {
@@ -173,7 +179,7 @@ private struct Scanner {
             guard bytes > 1_000_000 else { continue }  // empty or unfinished downloads
             let parts = n.dropFirst("models--".count).components(separatedBy: "--")
             items.append(Item(key: key(root + "/" + n), store: tilde(root), ids: [parts.joined(separator: "/"), parts.last ?? n],
-                              gb: Double(bytes) / 1e9, defaultKind: "Model"))
+                              gb: Double(bytes) / 1e9, defaultKind: "Model", added: created(root + "/" + n)))
         }
         return items
     }
@@ -184,10 +190,10 @@ private struct Scanner {
         // CACHEDIR.TAG) belongs in hfStores, not here.
         var found: [(rel: String, size: Int64)] = []
         walk(root, enter: { !fm.fileExists(atPath: $0 + "/CACHEDIR.TAG") }, into: &found)
-        return found.filter { $0.size >= 5_000_000 }.map { f in
+        return found.filter { $0.size >= 5_000_000 && !notModelExts.contains(ext($0.rel)) }.map { f in
             let path = root + "/" + f.rel, folder = parent(path)
             return Item(key: key(path), store: tilde(folder), ids: [lastPart(path)], gb: Double(f.size) / 1e9,
-                        defaultKind: folderKinds[lastPart(folder)] ?? "Model")
+                        defaultKind: folderKinds[lastPart(folder)] ?? "Model", added: created(path))
         }
     }
 
@@ -279,7 +285,9 @@ private struct Scanner {
         for rel in rels where !cfg.ignoreFiles.contains(where: { glob($0, rel) }) {
             let fileExt = ext(rel)
             let path = root + "/" + rel
-            guard codeExts.contains(fileExt) || fileExt.isEmpty else { continue }
+            // A skill's own instructions name the models it tells Claude to load; its other notes may only mention them.
+            let skillDoc = agent.isSkill && rel == "SKILL.md"
+            guard skillDoc || codeExts.contains(fileExt) || fileExt.isEmpty else { continue }
             if fileExt == "json" {  // JSON is often content or data; only settings files count
                 let name = lastPart(rel).lowercased()
                 guard git != nil, ["config", "settings", "engine"].contains(where: name.contains) else { continue }
@@ -355,7 +363,8 @@ private struct Scanner {
         var hopKeys: [String: [(item: Int, file: Int)]] = [:]
         for (i, fi) in direct {
             let f = files[fi], a = ags[f.agent]
-            users[i].append(User(agent: a.name, how: (a.isSkill ? "skill script " : "names it in ") + f.rel, tag: a.tag))
+            let how = !a.isSkill ? "names it in " + f.rel : f.rel == "SKILL.md" ? "named in the skill's instructions" : "skill script " + f.rel
+            users[i].append(User(agent: a.name, how: how, tag: a.tag))
             if let s = a.skillName { viaSkill.append((i, s)) }
             let parts = f.rel.split(separator: "/")
             if parts.count >= 2, scriptExts.contains(ext(f.rel)) {
@@ -403,9 +412,10 @@ private struct Scanner {
                          "Sound reader": "waveform", "Writing": "text.bubble", "Picture or video model": "photo.on.rectangle"]
             var id = m?.id ?? first.key
             while !usedIds.insert(id).inserted { id += "+" }  // a repeated id in the settings must not merge two rows
-            return Entry(id: id, name: m?.name ?? fallbackName, kind: m?.kind ?? first.defaultKind,
+            return Entry(id: id, name: m?.name ?? fallbackName, tech: m?.tech, does: m?.does, kind: m?.kind ?? first.defaultKind,
                          icon: m?.icon ?? icons[first.defaultKind] ?? "shippingbox", color: m?.color ?? "gray",
-                         what: m?.what ?? "Found on disk. No description yet.", gb: its.reduce(0) { $0 + $1.gb },
+                         what: m?.what ?? "Found on disk. No description yet.", added: its.compactMap(\.added).min(),
+                         gb: its.reduce(0) { $0 + $1.gb },
                          store: first.store, users: us, section: section, loaded: loaded, isNew: m == nil, note: m?.note,
                          files: its.map(\.key))
         }

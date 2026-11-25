@@ -17,12 +17,14 @@ in caches, and nobody remembers which ones still matter. Model Shelf answers thr
 
 - **What do I have?** Hugging Face caches, ComfyUI and LM Studio model folders, and Ollama, with real sizes (files
   shared between models are counted once).
-- **What uses it?** It reads the code of every scheduled job and every skill in `~/.claude/skills`, and lists each job
-  or skill that names a model. It follows one step further: a job that runs a script or a skill which names the model
-  counts too. Scheduled jobs are launchd agents on a Mac, systemd user services and the crontab on Linux, and Task
-  Scheduler tasks on Windows.
-- **What can go?** Models nothing uses are grouped under "Not used". Ollama models in memory right now are marked
-  "Loaded".
+- **What uses it?** It reads the code of every scheduled job and every skill in `~/.claude/skills` (a skill's scripts
+  and its own `SKILL.md`), and lists each job or skill that names a model. It follows one step further: a job that runs
+  a script or a skill which names the model counts too. Scheduled jobs are launchd agents on a Mac, systemd user
+  services and the crontab on Linux, and Task Scheduler tasks on Windows.
+- **What can go?** Models are grouped as "In use", "Resting" (kept, but nothing runs them) and "Leftovers" (nothing
+  uses them). A new download says when it arrived. Ollama models in memory right now are marked "Loaded".
+- **In plain words.** Give a model a plain name, a few words on what it does, and its technical name in the settings,
+  and the panel shows "Picture maker · Makes every still" with the technical name in the detail.
 
 On a Mac it checks again every 15 minutes, and when you open it if the last check is more than 5 minutes old. A new
 model shows up on its own, marked "New". A new job that uses a model shows up under it. A removed model drops off.
@@ -106,7 +108,7 @@ settings file. Every field is optional; see [`docs/shelf.example.json`](docs/she
 | `skillNames` | Friendly names for skills. |
 | `skipAgents` | Job folders to leave out. |
 | `ignoreFiles` | Paths inside a job folder that do not count (tests and docs by default). |
-| `models` | Descriptions. Each has `id`, `name`, `kind`, `what`, and `match`: wildcard patterns (`*`, `?`) on the file's path from your home folder, written with `/`, or `ollama/<tag>`. Optional `icon` (an SF Symbol), `color`, `note`, `status` (`idle` or `unused`, for a model the code names but never calls) and `notUsedBy` (names to drop when the code search links one by mistake). |
+| `models` | Descriptions. Each has `id`, `name`, `kind`, `what`, and `match`: wildcard patterns (`*`, `?`) on the file's path from your home folder, written with `/`, or `ollama/<tag>`. Optional `tech` (the technical name, shown small in the detail), `does` (a few words shown on the row, like "Makes every still"), `icon` (an SF Symbol), `color`, `note`, `status` (`idle` or `unused`, for a model the code names but never calls) and `notUsedBy` (names to drop when the code search links one by mistake). |
 
 Grouping matters for models that load helper files: put a model's text encoder, VAE or add-ons in its `match` list,
 and any model that another library loads for it (one video model loads a separate text model, for example).
@@ -115,7 +117,10 @@ and any model that another library loads for it (one video model loads a separat
 
 - It finds uses by name in code. A model loaded only by a third-party library, or chosen at run time from a setting
   it cannot read, will look unused until you group or describe it in the settings.
-- Apart from Ollama's "Loaded", it does not watch what runs. "Used" means a job or skill names the model.
+- Apart from Ollama's "Loaded", it does not watch what runs. "In use" means a job or skill names the model.
+- Only a skill's own `SKILL.md` counts among its notes, so a model a skill's instructions name counts as used. Its
+  other notes (`references/` and the like) do not, because they often mention models only to say they were dropped.
+- In model folders, logs, text, Markdown, JSON, lock, CSV and HTML files are never models, however big.
 - Only scheduled jobs and skills count as users. Scripts you run by hand do not, and neither does a script that sits
   right in your home folder (reading all of home is off limits).
 - The menu bar panel is Mac only. Linux and Windows get the same scan as a list in the terminal.
