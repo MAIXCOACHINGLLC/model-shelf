@@ -44,7 +44,7 @@ Until then, a clean `swift build` with no new warnings is the bar.
 - `Sources/ShelfCore` has no UI. The panel (SwiftUI and AppKit) lives in `Sources/ModelShelf` behind `#if os(macOS)`.
 - Paths are joined and compared with "/" through the helpers in `Jobs.swift` (`norm`, `pathOf`) and `Scanner.swift`
   (`parent`, `lastPart`).
-- Words people see (panel, list, README) are plain: "Not used", "Check again", "Reading the disk".
+- Words people see (panel, list, README) are plain: "Leftovers", "Check again", "Reading the disk".
 
 ## Project rules
 

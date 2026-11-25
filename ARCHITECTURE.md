@@ -36,18 +36,23 @@ scheduled jobs, skills ────┘                          ├──> --lis
    built-in defaults (Hugging Face cache, ComfyUI and LM Studio folders, Ollama at `127.0.0.1:11434`, `~/.claude/skills`).
 2. **Model items.** Hugging Face caches: each `models--*` folder, sized from its snapshot files with links resolved, so
    a file two models share counts once; under 1 MB is skipped as an unfinished download. Model folders: every regular
-   file of 5 MB or more, typed by its folder (`loras`, `vae` and so on); a folder holding a Hugging Face cache
-   (`CACHEDIR.TAG`) is skipped. Ollama: `/api/tags` for what it holds and `/api/ps` for what is loaded now.
+   file of 5 MB or more, typed by its folder (`loras`, `vae` and so on), except logs, text, Markdown, lock, CSV
+   and HTML files (`notModelExts`); a folder holding a Hugging Face cache (`CACHEDIR.TAG`) is skipped. Each item keeps
+   the creation date of its folder or file when the system has one. Ollama: `/api/tags` for what it holds and
+   `/api/ps` for what is loaded now.
 3. **Agents.** Each scheduled job becomes the folder it runs from: the first of its paths inside home and outside
    private folders, raised to its git root when there is one, never home itself. Each skill folder is an agent too.
 4. **Code files.** In a git repository, `git ls-files` (when git is installed); otherwise a folder walk. Data
-   folders, ignored files (`ignoreFiles`), non-code files, files of 512 KB or more and binary files are left out.
+   folders, ignored files (`ignoreFiles`), non-code files, files of 512 KB or more and binary files are left out. One
+   exception to non-code: a skill's own `SKILL.md` at its top level is read; its other Markdown is not.
 5. **Name search.** An in-app fixed-string search, like `grep -o -F`: the longest name wins at each spot, and names
    shorter than 6 characters are not searched.
 6. **Links.** A file that names a model makes its job or skill a user. One more step: a job that runs that script
    (matched as `/folder/file`) or runs that skill (matched as `skills/<name>/`) is a user too.
 7. **Entries.** Items are grouped by the `match` patterns in the settings; anything unmatched is its own entry marked
-   "New". Each entry lands in Used, Idle (loaded in Ollama with no user, or set `idle`) or Not used, sorted by size.
+   "New". An entry carries the settings' `tech` and `does` and the earliest creation date of its items (`added`).
+   Each entry lands in `used` (shown as In use), `idle` (Resting: loaded in Ollama with no user, or set `idle`) or
+   `unused` (Leftovers), sorted by size.
 8. **Output and refresh.** The terminal prints one scan and stops. The Mac app scans at launch, every 15 minutes,
    and when the panel opens if the last scan is more than 5 minutes old. The scan runs in the background, one at a
    time.
@@ -95,3 +100,6 @@ settings), `PATH` (finding git on Linux and Windows), `SystemRoot` (finding Powe
 | 2026-11-15 | CI builds, tests and runs a real end-to-end find on macOS, Linux and Windows, only while the repository is public (public-only Mac CI since commit `2f8fad4`; all three systems since `8fc8937`; `ci.yml`) | CI is the proof for systems nobody runs by hand; minutes on a private repository are billed | TBD – confirm |
 | 2026-11-15 | One small folder walk instead of FileManager's enumerator (commit `3e3e517`) | CI on Linux and Windows caught a crash and a skipped-models bug in the enumerator path | FileManager's enumerator, which was replaced |
 | 2026-11-16 | One root AGENTS.md; CLAUDE.md is the single line `@AGENTS.md`; SECURITY.md, ARCHITECTURE.md and DESIGN_SYSTEM.md added | One rulebook for every coding tool, and docs that move with the code | A full CLAUDE.md beside AGENTS.md (two rulebooks drift) |
+| 2026-11-25 | Plain words: sections shown as In use, Resting, Leftovers (ids unchanged); optional `tech` and `does` in the settings; a new download shows the date it arrived | The owner could not tell what each model was for, or why a model sat unused | Keeping Used, Idle, Not used and technical names only |
+| 2026-11-25 | A skill's own `SKILL.md` counts as code; its other Markdown does not | A skill told Claude to load a model only in its instructions, so the shelf showed that model as unused | Reading every Markdown file in a skill (its notes name models it dropped) |
+| 2026-11-25 | Logs, text, Markdown, lock, CSV and HTML files in model folders are never models | A 6 MB download log showed up as a model | A size limit only; JSON is left in, since tokenizers can be large .json files |

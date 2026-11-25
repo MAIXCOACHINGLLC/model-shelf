@@ -184,6 +184,43 @@ final class ScannerTests: XCTestCase {
         XCTAssertEqual(try entry(try scan(cfg), "Clone").users.map(\.agent), ["renderer"])
     }
 
+    func testSkillInstructionsCountButNotItsNotes() throws {
+        try model("models/m/narrator-voice.bin")
+        try model("models/m/tried-once.bin")
+        try write("skills/films/SKILL.md", "Load narrator-voice.bin for the voice.\n")
+        try write("skills/films/references/lessons.md", "tried-once.bin read the words wrong, so it is out.\n")
+        try write("agents/render/README.md", "narrator-voice.bin\n")  // a job's notes never count, only a skill's own SKILL.md
+        try write("agents/render/run.py", "print('render')\n")
+        try job("com.test.render", runs: "agents/render/run.py")
+
+        let s = try scan()
+        XCTAssertEqual(try entry(s, "narrator-voice").users, [User(agent: "films skill", how: "named in the skill's instructions", tag: "skill")])
+        XCTAssertEqual(try entry(s, "tried-once").section, "unused")
+    }
+
+    func testDownloadLogsAreNotModels() throws {
+        try model("models/hf/xet/logs/xet_download.log", mb: 6)
+        try model("models/notes/big-notes.txt", mb: 6)
+        try model("models/diffusion_models/pic-model-q4.gguf")
+        XCTAssertEqual(try scan().entries.map(\.name), ["pic-model-q4"])
+    }
+
+    func testPlainWordsAndArrivalDateComeThrough() throws {
+        try model("models/diffusion_models/pic-model-q4.gguf")
+        try model("models/diffusion_models/stray.gguf")
+        let cfg = #"{"models": [{"id": "pic", "name": "Picture maker", "tech": "Pic Model Q4", "does": "Makes every still", "kind": "Pictures", "match": ["models/diffusion_models/pic-*"], "what": "x"}]}"#
+        let s = try scan(cfg)
+        let pic = try entry(s, "Picture maker")
+        XCTAssertEqual(pic.tech, "Pic Model Q4")
+        XCTAssertEqual(pic.does, "Makes every still")
+        let stray = try entry(s, "stray")
+        XCTAssertNil(stray.tech)
+        XCTAssertNil(stray.does)
+        #if os(macOS)  // a file's creation date is not kept on every Linux file system
+        XCTAssertLessThan(abs(try XCTUnwrap(stray.added).timeIntervalSinceNow), 60)
+        #endif
+    }
+
     func testOllamaModelInMemoryWithNoUserIsIdle() throws {
         let s = try scan(ollama: [
             "/api/tags": ["models": [["name": "chat-model:8b", "size": 5_000_000_000], ["name": "embedder:small", "size": 600_000_000]]],
@@ -262,7 +299,7 @@ final class ScannerTests: XCTestCase {
         let lines = listText(try scan(loaded: ["com.test.render"])).components(separatedBy: "\n")
         XCTAssertEqual(lines.first, "Models: 18 MB in 2 models")
         XCTAssertEqual(lines.filter { !$0.isEmpty }.map { $0.split(separator: " ").first.map(String.init) ?? "" },
-                       ["Models:", "Used", "pic-model-q4", "Not", "stray"])
+                       ["Models:", "In", "pic-model-q4", "Leftovers", "stray"])
         XCTAssertTrue(lines.contains { $0.contains("pic-model-q4") && $0.hasSuffix("render") })
         XCTAssertTrue(lines.contains { $0.contains("stray") && $0.hasSuffix("nothing uses it") })
         XCTAssertEqual(listText(Scan(entries: [], at: Date(), warnings: [])).prefix(15), "No models found")
