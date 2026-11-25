@@ -66,8 +66,9 @@ private struct SourceFile {
 
 private let codeExts: Set<String> = ["py", "sh", "zsh", "bash", "js", "mjs", "cjs", "ts", "json", "toml", "yaml", "yml", "plist", "swift"]
 private let scriptExts: Set<String> = ["py", "sh", "zsh", "bash", "js", "mjs", "cjs", "ts", ""]
-// Files in a model folder that are never models, however big: download logs, notes, settings.
-private let notModelExts: Set<String> = ["log", "txt", "md", "json", "lock", "csv", "html"]
+// Files in a model folder that are never models, however big: download logs and notes. JSON stays, since a model's
+// tokenizer can be a large .json file.
+private let notModelExts: Set<String> = ["log", "txt", "md", "lock", "csv", "html"]
 private let skipDirs: Set<String> = [".git", "node_modules", ".venv", "venv", "__pycache__", "runs", "next-runs", "state", "logs",
                                      "out", "projects", "site-packages", "data", "cache", "tmp", "build", "dist", ".wrangler"]
 // Folders in home whose code is never read, compared in lower case (Mac and Windows names ignore case). Hidden
@@ -286,7 +287,7 @@ private struct Scanner {
             let fileExt = ext(rel)
             let path = root + "/" + rel
             // A skill's own instructions name the models it tells Claude to load; its other notes may only mention them.
-            let skillDoc = agent.isSkill && rel == "SKILL.md"
+            let skillDoc = agent.isSkill && rel.lowercased() == "skill.md"
             guard skillDoc || codeExts.contains(fileExt) || fileExt.isEmpty else { continue }
             if fileExt == "json" {  // JSON is often content or data; only settings files count
                 let name = lastPart(rel).lowercased()
@@ -363,7 +364,7 @@ private struct Scanner {
         var hopKeys: [String: [(item: Int, file: Int)]] = [:]
         for (i, fi) in direct {
             let f = files[fi], a = ags[f.agent]
-            let how = !a.isSkill ? "names it in " + f.rel : f.rel == "SKILL.md" ? "named in the skill's instructions" : "skill script " + f.rel
+            let how = !a.isSkill ? "names it in " + f.rel : f.rel.lowercased() == "skill.md" ? "named in the skill's instructions" : "skill script " + f.rel
             users[i].append(User(agent: a.name, how: how, tag: a.tag))
             if let s = a.skillName { viaSkill.append((i, s)) }
             let parts = f.rel.split(separator: "/")

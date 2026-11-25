@@ -120,7 +120,7 @@ and any model that another library loads for it (one video model loads a separat
 - Apart from Ollama's "Loaded", it does not watch what runs. "In use" means a job or skill names the model.
 - Only a skill's own `SKILL.md` counts among its notes, so a model a skill's instructions name counts as used. Its
   other notes (`references/` and the like) do not, because they often mention models only to say they were dropped.
-- In model folders, logs, text, Markdown, JSON, lock, CSV and HTML files are never models, however big.
+- In model folders, logs, text, Markdown, lock, CSV and HTML files are never models, however big.
 - Only scheduled jobs and skills count as users. Scripts you run by hand do not, and neither does a script that sits
   right in your home folder (reading all of home is off limits).
 - The menu bar panel is Mac only. Linux and Windows get the same scan as a list in the terminal.

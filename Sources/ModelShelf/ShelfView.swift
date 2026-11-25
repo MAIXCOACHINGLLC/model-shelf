@@ -7,7 +7,7 @@ import SwiftUI
 
 private let sections: [(id: String, name: String, hint: String, color: Color)] = [
     ("used", "In use", "A job or skill uses these", Color(nsColor: .systemGreen)),
-    ("idle", "Resting", "Kept, but nothing runs them now", Color(nsColor: .systemOrange)),
+    ("idle", "Resting", "Kept, but no job runs them now", Color(nsColor: .systemOrange)),
     ("unused", "Leftovers", "Nothing uses these", Color(nsColor: .systemGray)),
 ]
 

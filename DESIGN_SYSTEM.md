@@ -71,7 +71,7 @@ System font everywhere; sizes in points. Numbers use monospaced digits.
 
 - **Header.** Title, total size and count, refresh button (`arrow.clockwise`, help text "Check again", spins while a
   scan runs), the usage bar split by section, the legend, then any warnings (`exclamationmark.triangle`).
-- **Section.** In use ("A job or skill uses these"), Resting ("Kept, but nothing runs them now"), Leftovers
+- **Section.** In use ("A job or skill uses these"), Resting ("Kept, but no job runs them now"), Leftovers
   ("Nothing uses these"), in that order, each with its total and its hint. Empty sections are hidden.
 - **Model row.** Icon tile, name with "Loaded" and "New" pills, a one-line subtitle, size, and a chevron that turns 90
   degrees when open. Click to open; one row open at a time. Subtitle, first match wins: "In memory now, no job names
